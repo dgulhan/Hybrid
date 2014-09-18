@@ -737,7 +737,7 @@ class utilities {
    double z=initial_z+(final_z-initial_z)*(t-initial_t)/(final_t-initial_t);
    double r=sqrt(pow(x,2)+pow(y,2)+pow(z,2));
    double eta=0.5*log((r+z)/(r-z));
-   cout<<"id"<<fragment->get_id()<<" mother id="<<fragment->get_mother()->get_id()<<" mother initial_x"<<fragment->get_mother()->get_initial_x()<<" mother final_x"<<fragment->get_mother()->get_initial_x()<<" t="<<t<<" x="<<x<<" initial_x="<<initial_x<<" final_x="<<final_x<<" initial_y="<<initial_y<<" y="<<y<<" eta="<<eta<<endl;
+   // cout<<"id"<<fragment->get_id()<<" mother id="<<fragment->get_mother()->get_id()<<" mother initial_x"<<fragment->get_mother()->get_initial_x()<<" mother final_x"<<fragment->get_mother()->get_initial_x()<<" t="<<t<<" x="<<x<<" initial_x="<<initial_x<<" final_x="<<final_x<<" initial_y="<<initial_y<<" y="<<y<<" eta="<<eta<<endl;
    T = hydro->get_hydro_T(t,x,y,eta);
    double vx = hydro->get_hydro_vx(t,x,y,eta);
    double vy = hydro->get_hydro_vy(t,x,y,eta);
@@ -749,11 +749,11 @@ class utilities {
    double wdotv=v->Vector3::dot(w);
    double vdotv=v->Vector3::dot(v);
    double coef=sqrt(wdotw+pow(gamma,2)*(vdotv-2*wdotv+pow(wdotv,2)));
-    
+   cout<<"coef="<<coef<<endl;
    double initial_tplasma=initial_t*coef;
    double tplasma=initial_tplasma;
    while(t<final_t){    
-    if(T<Tc) break;
+    if(T<(Tc/1000)) break;
     if(quench_method!=3){
      integral += pow(T,power)*pow((tplasma-initial_tplasma)*5,power_t)*dt*coef*5;
     }else{
@@ -798,6 +798,7 @@ class utilities {
    }
    else if(quench_method == 1){
     E=Ei-C*factor*integral;
+    cout<<"E="<<E<<" subtracted"<<C*factor*integral<<" Ei="<<Ei<<endl;
    }
    else if(quench_method==2 && Ei>0.0001){
     double deltaE= 1-2*factor*pow(C,1.33333)*(1/pow(Ei,0.33333))*integral;
@@ -808,6 +809,7 @@ class utilities {
     E=Ei-C*factor*integral;
    }
    if(E<0) E=0;
+   cout<<"E="<<E<<" Ei="<<Ei<<endl;
    fragment->set_quenched_E(E);
   }
   
