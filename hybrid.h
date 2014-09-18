@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <time.h>
 // #include "Glauber/IntegrateT_v4.C"
 // #include "Glauber/LQNumericIntegral.C"
 // #include "Glauber/LQNumericIntegral_v2.C"
@@ -35,6 +36,29 @@ static inline std::string &rtrim(string &s) {
 static inline string &trim(string &s) {
  return ltrim(rtrim(s));
 }
+
+struct 3Vector
+{
+ private:
+  double x;
+  double y;
+  double z;
+ public:
+  void reset(double x, double y, double z){
+   this->x=x;
+   this->y=y;
+   this->z=z;
+  }
+  3Vector(double x, double y, double z){
+   reset(x,y,z)
+  }
+  double get_x(){return x;}
+  double get_y(){return y;}
+  double get_z(){return z;}
+  double dot(3Vector *v2){
+   return x*v2->get_x()+y*v2->get_y()+z*v2->get_z();
+  }
+};
 
 struct Hydro
 {
@@ -78,15 +102,16 @@ struct Hydro
     double vx;
     double vy;
     double veta;
+    double phase;
 	
 	  stringstream line_s;
     line_s << line;
-    line_s >> tau >> x >> y >> eta >> E >> T >> vx >> vy >> veta;
+    line_s >> tau >> x >> y >> eta >> E >> T >> phase >> vx >> vy >> veta;
+	if(tau==-999)break;
     int it = int((tau+deltat/2.-tau0)/deltat);
     int ix = int((x+deltax*maxx/2.+deltax/2.)/deltax);
     int iy = int((y+deltay/2.)/deltay);
     int ih = int((eta+deltah/2.)/deltah);
-
     hydro_T[it][ix][iy][ih]=T;
     hydro_E[it][ix][iy][ih]=E;
     hydro_vx[it][ix][iy][ih]=vx;
@@ -103,6 +128,9 @@ struct Hydro
   cout<<"end"<<endl;
  }
  
+ double get_maxx(){return maxx;}
+ double get_maxy(){return maxy;}
+ double get_maxh(){return maxh;}
  int get_it(double tau){
   int it=int((tau-tau0)/deltat);
   return it;
@@ -196,7 +224,7 @@ struct Hydro
   if (tau>tau1) {
    return T;
   }
-  
+  // cout << "it= "<<it<<" ix="<<ix<<" iy= "<<iy<<" ih="<<ih <<" dx="<<dx<<" dy= "<<dy<<" dh="<<dh<<" hydro_E[it][ix][iy][ih]="<<hydro_E[it][ix][iy][ih]<<endl;
   if (ix<0 || ix>maxx || iy>maxy || ih>maxh) return T;
   
   T=hydro_T[it][ix][iy][ih]*(1.-dt)*(1.-dx)*(1.-dy)*(1.-dh);
@@ -216,7 +244,7 @@ struct Hydro
   T+=hydro_T[it+1][ix][iy+1][ih+1]*(1.-dx)*dy*dt*dh;
   T+=hydro_T[it+1][ix+1][iy+1][ih+1]*dx*dy*dt*dh;
   
-  return T/1000; 
+  return T/1000.; 
  }
  
  double get_hydro_vx(double tau, double x, double y, double eta){ 
@@ -257,7 +285,7 @@ struct Hydro
  }
  
  double get_hydro_vy(double tau, double x, double y, double eta){ 
-int it=get_it(tau);
+  int it=get_it(tau);
   int ix=get_ix(x);
   int iy=get_iy(y);
   int ih=get_ih(eta);
@@ -294,7 +322,7 @@ int it=get_it(tau);
  }
  
  double get_hydro_vh(double tau, double x, double y, double eta){ 
- int it=get_it(tau);
+  int it=get_it(tau);
   int ix=get_ix(x);
   int iy=get_iy(y);
   int ih=get_ih(eta);
@@ -451,15 +479,10 @@ struct Fragment
   }
   void set_initial_coordinates(){
    if(id>3 && mother->get_id()==3){
-    initial_x=0;
-    initial_y=0;
-    initial_z=0;
-
     final_x=initial_x+get_tauf()*px/E;
     final_y=initial_y+get_tauf()*py/E;
     final_z=initial_z+get_tauf()*pz/E;
-
-
+    
     phi=atan2(get_py(),get_px());
    }
    else if(mother->get_id()!=3){
@@ -474,6 +497,9 @@ struct Fragment
    else cout << "problem"<<endl;
   }
 
+  void set_initial_x(double initial_x){this->initial_x=initial_x;}
+  void set_initial_y(double initial_y){this->initial_y=initial_y;}
+  void set_initial_z(double initial_z){this->initial_z=initial_z;}
   double get_initial_x(){return initial_x;}
   double get_initial_y(){return initial_y;}
   double get_initial_z(){return initial_z;}
@@ -492,9 +518,9 @@ struct Fragment
   void set_quench_method(int quench_method){
    this->quench_method=quench_method;
    if(quench_method==0) power=1.;
-   if(quench_method==1) power=2.;
-   if(quench_method==2) power=1.33333;
-   if(quench_method==4){
+   else if(quench_method==1) power=2.;
+   else if(quench_method==2) power=1.33333;
+   else if(quench_method==4){
     power=3.;
     power_t=1.;
    }
@@ -662,15 +688,22 @@ struct Jet
 
 class utilities {
  public:
-  static double integrate_T(Fragment *fragment, Hydro *hydro, double factor){
+  static void integrate_T(Fragment *fragment, Hydro *hydro, double factor){
    double Tc=200;
-   
    int id=fragment->get_id();
    double Ei=fragment->get_initial_E();
+   double px=fragment->get_px();
+   double py=fragment->get_py();
+   double pz=fragment->get_pz();
+   3Vector *w=new 3Vector(px/Ei,py/Ei,pz/Ei);
+   double wdotw=w->dot(w);
+   
    double E=Ei;
 
-   if(id<=3) return E;
-  
+   if(id<=3 || fragment->get_taus()<0.6){
+    fragment->set_quenched_E(E);
+	  return;
+   }
    double integral=0;
  
    double initial_x=fragment->get_initial_x();
@@ -679,7 +712,7 @@ class utilities {
    double initial_t=fragment->get_mother()->get_taus();
    double initial_r=sqrt(pow(initial_x,2)+pow(initial_y,2)+pow(initial_z,2));
    double initial_eta=0.5*log((initial_r+initial_z)/(initial_r-initial_z));
-   
+
    double final_x=fragment->get_final_x();
    double final_y=fragment->get_final_y();
    double final_z=fragment->get_final_z();
@@ -687,10 +720,8 @@ class utilities {
    
    double power=fragment->get_power();
    double power_t=fragment->get_power_t();
-  
-   double T = hydro->get_hydro_T(initial_t,initial_x,initial_y,initial_eta);
+   double T = 0;
    double tstop=0;
-   
    int quench_method=fragment->get_quench_method();
    
    double C;
@@ -698,37 +729,74 @@ class utilities {
    if(QG==1) C=1; 
    if(QG==2) C=9/4;
    
-   if(quench_method==3) tstop=0.2*pow(Ei/C,1./3.)/(2*factor*pow(T,4./3.)); 
   
    double dt=0.01; 
    double t=initial_t;
+   if(initial_t<0.6) t=0.6;
   
-   while(t<final_t){
-    if(t<0.6) continue;
-    double x=initial_x+(final_x-initial_x)*(t-initial_t)/(final_t-initial_t);
-    double y=initial_y+(final_y-initial_y)*(t-initial_t)/(final_t-initial_t);
-    double z=initial_z+(final_z-initial_z)*(t-initial_t)/(final_t-initial_t);
-    double r=sqrt(pow(x,2)+pow(y,2)+pow(z,2));
-    double eta=0.5*log((r+z)/(r-z));
-
-    T = hydro->get_hydro_T(t,x,y,eta);
+   double x=initial_x+(final_x-initial_x)*(t-initial_t)/(final_t-initial_t);
+   double y=initial_y+(final_y-initial_y)*(t-initial_t)/(final_t-initial_t);
+   double z=initial_z+(final_z-initial_z)*(t-initial_t)/(final_t-initial_t);
+   double r=sqrt(pow(x,2)+pow(y,2)+pow(z,2));
+   double eta=0.5*log((r+z)/(r-z));
+   
+   T = hydro->get_hydro_T(t,x,y,eta);
+   double vx = hydro->get_hydro_vx(t,x,y,eta);
+   double vy = hydro->get_hydro_vy(t,x,y,eta);
+   double vh = hydro->get_hydro_vh(t,x,y,eta);
+       
+   double gamma=cosh(vh);
+   double vz=sqrt(1-1/pow(gamma,2.)-pow(vx,2.)-pow(vy,2.));
+   
+   3Vector *v= new 3Vector(vx,vy,vz);
+   double wdotv=v->3Vector::dot(w);
+   double vdotv=v->3Vector::dot(v);
+   double coef=sqrt(wdotw+pow(gamma,2)*(vdotv-2*vdotw+pow(vdotw,2)))
+    
+   double initial_tplasma=initial_t*coef;
+   double tplasma=initial_tplasma;
+   
+   while(t<final_t){    
     if(T<Tc) break;
     if(quench_method!=3){
-     integral += pow(T,power)*pow(t-initial_t,power_t)*dt*5;
+     integral += pow(T,power)*pow((t-initial_t)*5,power_t)*dt*coef*5;
     }else{
-     if((t-initial_t)>tstop){
+     double EFi=Ei*gamma*(1-wdotv);
+     tstop=0.2*pow(EFi/C,1./3.)/(2*factor*pow(T,4./3.)); 
+     if((tplasma-initial_tplasma)>tstop){
       E=0;
       break;
      } 
-     E += (-((4*Ei/3.141592)*pow(t-initial_t,2))/(pow(tstop,2)*sqrt(pow(tstop,2)-pow(t-initial_t,2))))*dt;
+     E += (-((4*Ei/3.141592)*pow(t-initial_t,2))/(pow(tstop,2)*sqrt(pow(tstop,2)-pow(t-initial_t,2))))*dt*coef;
      if(E<0){
       E=0;
       break;
      }
     }
+    
     t=t+dt;
+    tplasma=tplasma+dt*coef;
+    x=initial_x+(final_x-initial_x)*(t-initial_t)/(final_t-initial_t);
+    y=initial_y+(final_y-initial_y)*(t-initial_t)/(final_t-initial_t);
+    z=initial_z+(final_z-initial_z)*(t-initial_t)/(final_t-initial_t);
+    r=sqrt(pow(x,2)+pow(y,2)+pow(z,2));
+    eta=0.5*log((r+z)/(r-z));
+     
+    T = hydro->get_hydro_T(t,x,y,eta);
+
+    vx = hydro->get_hydro_vx(t,x,y,eta);
+    vy = hydro->get_hydro_vy(t,x,y,eta);
+    vh = hydro->get_hydro_vh(t,x,y,eta);
+       
+    gamma=cosh(vh);
+    vz=sqrt(1-1/pow(gamma,2.)-pow(vx,2.)-pow(vy,2.));
+   
+    v->reset(vx,vy,vz);
+    wdotv=v->3Vector::dot(w);
+    vdotv=v->3Vector::dot(v);
+    coef=sqrt(wdotw+pow(gamma,2)*(vdotv-2*vdotw+pow(vdotw,2)))
    }
-  
+
    if(quench_method == 0){
     E=C*Ei*exp(-factor*integral); 
    }
@@ -744,7 +812,36 @@ class utilities {
     E=Ei-C*factor*integral;
    }
    if(E<0) E=0;
-	 fragment->set_quenched_E(E);
+   fragment->set_quenched_E(E);
+  }
+  
+  static double embed(Fragment *fragment, Hydro *hydro){
+
+   double t=0.6;
+   double maxx=hydro->get_maxx();
+   double maxy=hydro->get_maxy();
+   double maxh=hydro->get_maxh();
+   
+   bool passed_value=false;
+   double maxT6=0.005;
+   double x;
+   double y;
+   double h;
+   double T6,randT6;
+
+   while(!passed_value){
+	// cout<<"time"<<time(NULL)<<endl;
+    x=2*maxx*((double) (rand()%10000) / 10000.)-maxx;
+    y=2*maxy*((double) (rand()%10000) / 10000.)-maxy;
+    h=2*maxh*((double) (rand()%10000) / 10000.)-maxh;
+    randT6=maxT6*((double) (rand()%10000) / 10000.);
+    T6 = pow(hydro->get_hydro_T(t,x,y,h),6);
+    if(T6>randT6)passed_value=true;    
+   }
+   double z=sqrt(pow(x,2)+pow(y,2))*sinh(h);
+   fragment->set_initial_x(x);
+   fragment->set_initial_y(y);
+   fragment->set_initial_z(z);
   }
 };
 
@@ -934,15 +1031,18 @@ struct Event
   }
   
 
-   void set_all_taus_coordinates_geometry(){//!SET TAUS OF EACH PARTICLE UP TO THE HARD SCATTERING 
+   void set_all_taus_coordinates_geometry(Hydro *hydro){//!SET TAUS OF EACH PARTICLE UP TO THE HARD SCATTERING 
     Fragment * hard_scattering=findFragment_byId(3);
     for(int i=0; i<number_of_fragments; i++){
      Fragment * elem = fragments[i];
      if(elem->is_descendant(hard_scattering) && elem->get_id()!=3){
       fragments[i]->set_taus_geometry();
-      fragments[i]->set_initial_coordinates();
       if(fragments[i]->get_mother()->get_id()==3){
+       utilities::embed(fragments[i],hydro);
        if(fragments[i]->get_jet_index_incone_ancestor()>=0) jets[fragments[i]->get_jet_index_incone_ancestor()]->set_phi(fragments[i]->get_phi());
+      }
+      else{
+       fragments[i]->set_initial_coordinates();
       }
      }
     }
@@ -1004,7 +1104,7 @@ struct DataFile_Parser
  { 
   int ievent=0;
   bool hasjet=false;
-  cout<<"file: "<<file_path<<endl;
+  // cout<<"file: "<<file_path<<endl;
   ifstream input_file(file_path);
   int state=0;
   Event current;
@@ -1012,6 +1112,7 @@ struct DataFile_Parser
   state=1;
   while(getline(input_file,line))
   {
+   // cout<<"inside the while loop"<<endl;
    trim(line);
    if(line.length()==0) continue;
    // if(ievent==200000) break;
@@ -1024,14 +1125,14 @@ struct DataFile_Parser
     double E;
     double m;
     int momID;
-	int QG;
-	int initialIQG;
+	  int QG;
+	  int initialIQG;
     stringstream line_s;
     line_s << line;
-	//cout << "Line length: " << line.length() << endl;
-	//cout << "LINE: " << line << endl;
+	  // cout << "Line length: " << line.length() << endl;
+	  // cout << "LINE: " << line << endl;
     line_s >> id >> px >> py >> pz >> E >> m >> momID >> QG >> initialIQG;
-    //cout << "Adding fragment with the following params:" << " " << id << " " << px << " " << py << " " << pz << " " << E << " " << m << " " << momID << " " << QG << " " << initialIQG << endl;
+    // cout << "Adding fragment with the following params:" << " " << id << " " << px << " " << py << " " << pz << " " << E << " " << m << " " << momID << " " << QG << " " << initialIQG << endl;
     current.add_fragment(id, px, py, pz, E, m, momID,QG,initialIQG);
    }
    else if(state==1 and string::npos != line.find("JETS"))
