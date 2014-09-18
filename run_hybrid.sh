@@ -1,5 +1,7 @@
 # [method][Tc][RAAfit]
 
+ g++ hybrid.cc
+ 
  for Tc in 180 200
   do
   for quench_method in 1 4 3 
