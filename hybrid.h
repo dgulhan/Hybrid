@@ -37,7 +37,7 @@ static inline string &trim(string &s) {
  return ltrim(rtrim(s));
 }
 
-struct 3Vector
+struct Vector3
 {
  private:
   double x;
@@ -49,13 +49,13 @@ struct 3Vector
    this->y=y;
    this->z=z;
   }
-  3Vector(double x, double y, double z){
-   reset(x,y,z)
+  Vector3(double x, double y, double z){
+   reset(x,y,z);
   }
   double get_x(){return x;}
   double get_y(){return y;}
   double get_z(){return z;}
-  double dot(3Vector *v2){
+  double dot(Vector3 *v2){
    return x*v2->get_x()+y*v2->get_y()+z*v2->get_z();
   }
 };
@@ -688,24 +688,23 @@ struct Jet
 
 class utilities {
  public:
-  static void integrate_T(Fragment *fragment, Hydro *hydro, double factor){
-   double Tc=200;
+  static void integrate_T(Fragment *fragment, Hydro *hydro, double factor, double Tc){
    int id=fragment->get_id();
+
    double Ei=fragment->get_initial_E();
+
    double px=fragment->get_px();
    double py=fragment->get_py();
    double pz=fragment->get_pz();
-   3Vector *w=new 3Vector(px/Ei,py/Ei,pz/Ei);
-   double wdotw=w->dot(w);
-   
-   double E=Ei;
 
+   Vector3 *w=new Vector3(px/Ei,py/Ei,pz/Ei);
+   double wdotw=w->dot(w);
+   double E=Ei;
    if(id<=3 || fragment->get_taus()<0.6){
     fragment->set_quenched_E(E);
 	  return;
    }
    double integral=0;
- 
    double initial_x=fragment->get_initial_x();
    double initial_y=fragment->get_initial_y();
    double initial_z=fragment->get_initial_z();
@@ -729,37 +728,34 @@ class utilities {
    if(QG==1) C=1; 
    if(QG==2) C=9/4;
    
-  
+
    double dt=0.01; 
    double t=initial_t;
    if(initial_t<0.6) t=0.6;
-  
    double x=initial_x+(final_x-initial_x)*(t-initial_t)/(final_t-initial_t);
    double y=initial_y+(final_y-initial_y)*(t-initial_t)/(final_t-initial_t);
    double z=initial_z+(final_z-initial_z)*(t-initial_t)/(final_t-initial_t);
    double r=sqrt(pow(x,2)+pow(y,2)+pow(z,2));
    double eta=0.5*log((r+z)/(r-z));
-   
+   cout<<"id"<<fragment->get_id()<<" mother id="<<fragment->get_mother()->get_id()<<" mother initial_x"<<fragment->get_mother()->get_initial_x()<<" mother final_x"<<fragment->get_mother()->get_initial_x()<<" t="<<t<<" x="<<x<<" initial_x="<<initial_x<<" final_x="<<final_x<<" initial_y="<<initial_y<<" y="<<y<<" eta="<<eta<<endl;
    T = hydro->get_hydro_T(t,x,y,eta);
    double vx = hydro->get_hydro_vx(t,x,y,eta);
    double vy = hydro->get_hydro_vy(t,x,y,eta);
    double vh = hydro->get_hydro_vh(t,x,y,eta);
-       
    double gamma=cosh(vh);
    double vz=sqrt(1-1/pow(gamma,2.)-pow(vx,2.)-pow(vy,2.));
    
-   3Vector *v= new 3Vector(vx,vy,vz);
-   double wdotv=v->3Vector::dot(w);
-   double vdotv=v->3Vector::dot(v);
-   double coef=sqrt(wdotw+pow(gamma,2)*(vdotv-2*vdotw+pow(vdotw,2)))
+   Vector3 *v= new Vector3(vx,vy,vz);
+   double wdotv=v->Vector3::dot(w);
+   double vdotv=v->Vector3::dot(v);
+   double coef=sqrt(wdotw+pow(gamma,2)*(vdotv-2*wdotv+pow(wdotv,2)));
     
    double initial_tplasma=initial_t*coef;
    double tplasma=initial_tplasma;
-   
    while(t<final_t){    
     if(T<Tc) break;
     if(quench_method!=3){
-     integral += pow(T,power)*pow((t-initial_t)*5,power_t)*dt*coef*5;
+     integral += pow(T,power)*pow((tplasma-initial_tplasma)*5,power_t)*dt*coef*5;
     }else{
      double EFi=Ei*gamma*(1-wdotv);
      tstop=0.2*pow(EFi/C,1./3.)/(2*factor*pow(T,4./3.)); 
@@ -767,13 +763,12 @@ class utilities {
       E=0;
       break;
      } 
-     E += (-((4*Ei/3.141592)*pow(t-initial_t,2))/(pow(tstop,2)*sqrt(pow(tstop,2)-pow(t-initial_t,2))))*dt*coef;
+     E += (-((4*EFi/3.141592)*pow(tplasma-initial_tplasma,2))/(pow(tstop,2)*sqrt(pow(tstop,2)-pow(tplasma-initial_tplasma,2))))*dt*coef;
      if(E<0){
       E=0;
       break;
      }
     }
-    
     t=t+dt;
     tplasma=tplasma+dt*coef;
     x=initial_x+(final_x-initial_x)*(t-initial_t)/(final_t-initial_t);
@@ -792,10 +787,11 @@ class utilities {
     vz=sqrt(1-1/pow(gamma,2.)-pow(vx,2.)-pow(vy,2.));
    
     v->reset(vx,vy,vz);
-    wdotv=v->3Vector::dot(w);
-    vdotv=v->3Vector::dot(v);
-    coef=sqrt(wdotw+pow(gamma,2)*(vdotv-2*vdotw+pow(vdotw,2)))
+    wdotv=v->Vector3::dot(w);
+    vdotv=v->Vector3::dot(v);
+    coef=sqrt(wdotw+pow(gamma,2)*(vdotv-2*wdotv+pow(wdotv,2)));
    }
+                         cout<<"integrate_T.17"<<endl;
 
    if(quench_method == 0){
     E=C*Ei*exp(-factor*integral); 
@@ -1033,28 +1029,27 @@ struct Event
 
    void set_all_taus_coordinates_geometry(Hydro *hydro){//!SET TAUS OF EACH PARTICLE UP TO THE HARD SCATTERING 
     Fragment * hard_scattering=findFragment_byId(3);
+	utilities::embed(hard_scattering,hydro);
+
     for(int i=0; i<number_of_fragments; i++){
      Fragment * elem = fragments[i];
      if(elem->is_descendant(hard_scattering) && elem->get_id()!=3){
       fragments[i]->set_taus_geometry();
       if(fragments[i]->get_mother()->get_id()==3){
-       utilities::embed(fragments[i],hydro);
        if(fragments[i]->get_jet_index_incone_ancestor()>=0) jets[fragments[i]->get_jet_index_incone_ancestor()]->set_phi(fragments[i]->get_phi());
       }
-      else{
-       fragments[i]->set_initial_coordinates();
-      }
+      fragments[i]->set_initial_coordinates();
      }
     }
    }
 
-   void quench_geometry(Hydro* hydro, double factor,int quench_method=0){
+   void quench_geometry(Hydro* hydro, double factor,int quench_method=0,double Tc=200){
     Fragment * hard_scattering=findFragment_byId(3);
     for(int i=0; i<number_of_fragments; i++){
      Fragment * elem = fragments[i];
      if(elem->is_descendant(hard_scattering) and elem->get_id()!=3){
       fragments[i]->set_quench_method(quench_method);
-      utilities::integrate_T(fragments[i], hydro, factor);
+      utilities::integrate_T(fragments[i], hydro, factor,Tc);
      }
     }
    }
