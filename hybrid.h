@@ -12,30 +12,34 @@
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
+#include "hydro.h"
 // #include "Glauber/IntegrateT_v4.C"
 // #include "Glauber/LQNumericIntegral.C"
 // #include "Glauber/LQNumericIntegral_v2.C"
 // #include "Glauber/jetPosition.C"
 // #include "Glauber/fTnucleon.h"
+// #include "TH2D.h"
+// #include "TH1D.h"
+// #include "TFile.h"
 
 using namespace std;
 
 // trim from start
-static inline string &ltrim(string &s) {
- s.erase(s.begin(), std::find_if(s.begin(), s.end(), not1(ptr_fun<int, int>(isspace))));
- return s;
-}
+// static inline string &ltrim(string &s) {
+ // s.erase(s.begin(), std::find_if(s.begin(), s.end(), not1(ptr_fun<int, int>(isspace))));
+ // return s;
+// }
 
 // trim from end
-static inline std::string &rtrim(string &s) {
- s.erase(find_if(s.rbegin(), s.rend(), not1(ptr_fun<int, int>(isspace))).base(), s.end());
- return s;
-}
+// static inline std::string &rtrim(string &s) {
+ // s.erase(find_if(s.rbegin(), s.rend(), not1(ptr_fun<int, int>(isspace))).base(), s.end());
+ // return s;
+// }
 
 // trim from both ends
-static inline string &trim(string &s) {
- return ltrim(rtrim(s));
-}
+// static inline string &trim(string &s) {
+ // return ltrim(rtrim(s));
+// }
 
 struct Vector3
 {
@@ -58,305 +62,6 @@ struct Vector3
   double dot(Vector3 *v2){
    return x*v2->get_x()+y*v2->get_y()+z*v2->get_z();
   }
-};
-
-struct Hydro
-{
- private:
- double hydro_T[101][121][61][21];
- double hydro_E[101][121][61][21];
- double hydro_vx[101][121][61][21];
- double hydro_vy[101][121][61][21];
- double hydro_vh[101][121][61][21];
- 
- static const int maxx=120;
- static const int maxy=60;
- static const int maxh=20;
- static const double tau0=0.6;
- static const double tau1=24.6;
- static const double deltat=0.3;
- static const double deltax=0.3;
- static const double deltay=0.3;
- static const double deltah=0.3;
- 
- public:
- Hydro(const char *file_path)
- { 
-  cout<<"start"<<endl;
-  int ipoint=0;
-  ifstream input_file(file_path);
-  string line;
-  int state=1;
-  while(getline(input_file,line))
-  {
-   trim(line);
-   if(line.length()==0) continue;
-   if(state==1)
-   {
-    double tau;
-    double x;
-    double y;
-    double eta;
-    double E;
-    double T;
-    double vx;
-    double vy;
-    double veta;
-    double phase;
-	
-	  stringstream line_s;
-    line_s << line;
-    line_s >> tau >> x >> y >> eta >> E >> T >> phase >> vx >> vy >> veta;
-	if(tau==-999)break;
-    int it = int((tau+deltat/2.-tau0)/deltat);
-    int ix = int((x+deltax*maxx/2.+deltax/2.)/deltax);
-    int iy = int((y+deltay/2.)/deltay);
-    int ih = int((eta+deltah/2.)/deltah);
-    hydro_T[it][ix][iy][ih]=T;
-    hydro_E[it][ix][iy][ih]=E;
-    hydro_vx[it][ix][iy][ih]=vx;
-    hydro_vy[it][ix][iy][ih]=vy;
-    hydro_vh[it][ix][iy][ih]=veta;
-   }
-   else
-   {
-    cout <<"Unexpected else. Exiting..." << endl;
-    exit(1);
-   }
-  }
-  input_file.close();
-  cout<<"end"<<endl;
- }
- 
- double get_maxx(){return maxx;}
- double get_maxy(){return maxy;}
- double get_maxh(){return maxh;}
- int get_it(double tau){
-  int it=int((tau-tau0)/deltat);
-  return it;
- }
- 
- double get_dt(int it,double tau){
-  double dt=(tau-tau0-double(it)*deltat)/deltat;
-  return dt;
- }
- 
- int get_ix(double x){
-  int ix;
-  if(x>0.) ix=((int)(x/deltax)+maxx/2.);
-  else ix=((int)(-x/deltax)+maxx/2.-1);
-  return ix;
- }
- 
- double get_dx(int ix,double x){
-  double dx=(fabs(x)-double(ix-maxx/2.)*deltax)/deltax;
-  return dx;
- }
- 
- int get_iy(double y){
-  int iy=(int)(fabs(y)/deltay);
-  return iy;
- }
- 
- double get_dy(int iy,double y){
-  double dy=(fabs(y)-double(iy)*deltay)/deltay;
-  return dy;
- }
- 
- int get_ih(double eta){
-  int ih=int(fabs(eta/deltah));
-  return ih;
- }
- 
- double get_dh(int ih,double eta){
-  double dh=(fabs(eta)-double(ih)*deltah)/deltah;
-  return dh;  
- }
- 
- double get_hydro_E(double tau, double x, double y, double eta){ 
-  int it=get_it(tau);
-  int ix=get_ix(x);
-  int iy=get_iy(y);
-  int ih=get_ih(eta);
-  double dt=get_dt(it,tau);
-  double dx=get_dx(ix,x);
-  double dy=get_dy(iy,y);
-  double dh=get_dh(ih,eta);
-  double E=0;
-  
-  if (tau>tau1) {
-   return E;
-  }
-  
-  if (ix<0 || ix>maxx || iy>maxy || ih>maxh) return E;
-  
-  E=hydro_E[it][ix][iy][ih]*(1.-dt)*(1.-dx)*(1.-dy)*(1.-dh);
-  E+=hydro_E[it+1][ix][iy][ih]*(1.-dx)*(1.-dy)*(1.-dh)*dt;
-  E+=hydro_E[it][ix+1][iy][ih]*(1.-dt)*(1.-dy)*(1.-dh)*dx;
-  E+=hydro_E[it][ix][iy+1][ih]*(1.-dx)*(1.-dt)*(1.-dh)*dy;
-  E+=hydro_E[it][ix][iy][ih+1]*(1.-dx)*(1.-dy)*(1.-dt)*dh;
-  E+=hydro_E[it+1][ix+1][iy][ih]*dx*(1.-dy)*(1.-dh)*dt;
-  E+=hydro_E[it][ix+1][iy+1][ih]*(1.-dt)*dy*(1.-dh)*dx;
-  E+=hydro_E[it][ix][iy+1][ih+1]*(1.-dx)*(1.-dt)*dh*dy;
-  E+=hydro_E[it][ix+1][iy][ih+1]*dx*(1.-dy)*(1.-dt)*dh;
-  E+=hydro_E[it+1][ix][iy+1][ih]*(1.-dx)*dt*(1.-dh)*dy;
-  E+=hydro_E[it+1][ix][iy][ih+1]*(1.-dx)*(1.-dy)*dt*dh;
-  E+=hydro_E[it][ix+1][iy+1][ih+1]*dx*(1.-dt)*dh*dy;
-  E+=hydro_E[it+1][ix+1][iy][ih+1]*dx*(1.-dy)*dt*dh;
-  E+=hydro_E[it+1][ix+1][iy+1][ih]*dx*dt*(1.-dh)*dy;
-  E+=hydro_E[it+1][ix][iy+1][ih+1]*(1.-dx)*dy*dt*dh;
-  E+=hydro_E[it+1][ix+1][iy+1][ih+1]*dx*dy*dt*dh;
-  
-  return E/1000;  
- }
- 
- double get_hydro_T(double tau, double x, double y, double eta){ 
-  int it=get_it(tau);
-  int ix=get_ix(x);
-  int iy=get_iy(y);
-  int ih=get_ih(eta);
-  double dt=get_dt(it,tau);
-  double dx=get_dx(ix,x);
-  double dy=get_dy(iy,y);
-  double dh=get_dh(ih,eta);
-  double T=0;
-  
-  if (tau>tau1) {
-   return T;
-  }
-  // cout << "it= "<<it<<" ix="<<ix<<" iy= "<<iy<<" ih="<<ih <<" dx="<<dx<<" dy= "<<dy<<" dh="<<dh<<" hydro_E[it][ix][iy][ih]="<<hydro_E[it][ix][iy][ih]<<endl;
-  if (ix<0 || ix>maxx || iy>maxy || ih>maxh) return T;
-  
-  T=hydro_T[it][ix][iy][ih]*(1.-dt)*(1.-dx)*(1.-dy)*(1.-dh);
-  T+=hydro_T[it+1][ix][iy][ih]*(1.-dx)*(1.-dy)*(1.-dh)*dt;
-  T+=hydro_T[it][ix+1][iy][ih]*(1.-dt)*(1.-dy)*(1.-dh)*dx;
-  T+=hydro_T[it][ix][iy+1][ih]*(1.-dx)*(1.-dt)*(1.-dh)*dy;
-  T+=hydro_T[it][ix][iy][ih+1]*(1.-dx)*(1.-dy)*(1.-dt)*dh;
-  T+=hydro_T[it+1][ix+1][iy][ih]*dx*(1.-dy)*(1.-dh)*dt;
-  T+=hydro_T[it][ix+1][iy+1][ih]*(1.-dt)*dy*(1.-dh)*dx;
-  T+=hydro_T[it][ix][iy+1][ih+1]*(1.-dx)*(1.-dt)*dh*dy;
-  T+=hydro_T[it][ix+1][iy][ih+1]*dx*(1.-dy)*(1.-dt)*dh;
-  T+=hydro_T[it+1][ix][iy+1][ih]*(1.-dx)*dt*(1.-dh)*dy;
-  T+=hydro_T[it+1][ix][iy][ih+1]*(1.-dx)*(1.-dy)*dt*dh;
-  T+=hydro_T[it][ix+1][iy+1][ih+1]*dx*(1.-dt)*dh*dy;
-  T+=hydro_T[it+1][ix+1][iy][ih+1]*dx*(1.-dy)*dt*dh;
-  T+=hydro_T[it+1][ix+1][iy+1][ih]*dx*dt*(1.-dh)*dy;
-  T+=hydro_T[it+1][ix][iy+1][ih+1]*(1.-dx)*dy*dt*dh;
-  T+=hydro_T[it+1][ix+1][iy+1][ih+1]*dx*dy*dt*dh;
-  
-  return T/1000.; 
- }
- 
- double get_hydro_vx(double tau, double x, double y, double eta){ 
-  int it=get_it(tau);
-  int ix=get_ix(x);
-  int iy=get_iy(y);
-  int ih=get_ih(eta);
-  double dt=get_dt(it,tau);
-  double dx=get_dx(ix,x);
-  double dy=get_dy(iy,y);
-  double dh=get_dh(ih,eta);
-  double vx=0;
-  
-  if (tau>tau1) {
-   return vx;
-  }
-  
-  if (ix<0 || ix>maxx || iy>maxy || ih>maxh) return vx;
-  
-  vx=hydro_vx[it][ix][iy][ih]*(1.-dt)*(1.-dx)*(1.-dy)*(1.-dh);
-  vx+=hydro_vx[it+1][ix][iy][ih]*(1.-dx)*(1.-dy)*(1.-dh)*dt;
-  vx+=hydro_vx[it][ix+1][iy][ih]*(1.-dt)*(1.-dy)*(1.-dh)*dx;
-  vx+=hydro_vx[it][ix][iy+1][ih]*(1.-dx)*(1.-dt)*(1.-dh)*dy;
-  vx+=hydro_vx[it][ix][iy][ih+1]*(1.-dx)*(1.-dy)*(1.-dt)*dh;
-  vx+=hydro_vx[it+1][ix+1][iy][ih]*dx*(1.-dy)*(1.-dh)*dt;
-  vx+=hydro_vx[it][ix+1][iy+1][ih]*(1.-dt)*dy*(1.-dh)*dx;
-  vx+=hydro_vx[it][ix][iy+1][ih+1]*(1.-dx)*(1.-dt)*dh*dy;
-  vx+=hydro_vx[it][ix+1][iy][ih+1]*dx*(1.-dy)*(1.-dt)*dh;
-  vx+=hydro_vx[it+1][ix][iy+1][ih]*(1.-dx)*dt*(1.-dh)*dy;
-  vx+=hydro_vx[it+1][ix][iy][ih+1]*(1.-dx)*(1.-dy)*dt*dh;
-  vx+=hydro_vx[it][ix+1][iy+1][ih+1]*dx*(1.-dt)*dh*dy;
-  vx+=hydro_vx[it+1][ix+1][iy][ih+1]*dx*(1.-dy)*dt*dh;
-  vx+=hydro_vx[it+1][ix+1][iy+1][ih]*dx*dt*(1.-dh)*dy;
-  vx+=hydro_vx[it+1][ix][iy+1][ih+1]*(1.-dx)*dy*dt*dh;
-  vx+=hydro_vx[it+1][ix+1][iy+1][ih+1]*dx*dy*dt*dh;
-  
-  return vx/1000; 
- }
- 
- double get_hydro_vy(double tau, double x, double y, double eta){ 
-  int it=get_it(tau);
-  int ix=get_ix(x);
-  int iy=get_iy(y);
-  int ih=get_ih(eta);
-  double dt=get_dt(it,tau);
-  double dx=get_dx(ix,x);
-  double dy=get_dy(iy,y);
-  double dh=get_dh(ih,eta);
-  double vy=0;
-  
-  if (tau>tau1) {
-   return vy;
-  }
-  
-  if (ix<0 || ix>maxx || iy>maxy || ih>maxh) return vy;
-  
-  vy=hydro_vy[it][ix][iy][ih]*(1.-dt)*(1.-dx)*(1.-dy)*(1.-dh);
-  vy+=hydro_vy[it+1][ix][iy][ih]*(1.-dx)*(1.-dy)*(1.-dh)*dt;
-  vy+=hydro_vy[it][ix+1][iy][ih]*(1.-dt)*(1.-dy)*(1.-dh)*dx;
-  vy+=hydro_vy[it][ix][iy+1][ih]*(1.-dx)*(1.-dt)*(1.-dh)*dy;
-  vy+=hydro_vy[it][ix][iy][ih+1]*(1.-dx)*(1.-dy)*(1.-dt)*dh;
-  vy+=hydro_vy[it+1][ix+1][iy][ih]*dx*(1.-dy)*(1.-dh)*dt;
-  vy+=hydro_vy[it][ix+1][iy+1][ih]*(1.-dt)*dy*(1.-dh)*dx;
-  vy+=hydro_vy[it][ix][iy+1][ih+1]*(1.-dx)*(1.-dt)*dh*dy;
-  vy+=hydro_vy[it][ix+1][iy][ih+1]*dx*(1.-dy)*(1.-dt)*dh;
-  vy+=hydro_vy[it+1][ix][iy+1][ih]*(1.-dx)*dt*(1.-dh)*dy;
-  vy+=hydro_vy[it+1][ix][iy][ih+1]*(1.-dx)*(1.-dy)*dt*dh;
-  vy+=hydro_vy[it][ix+1][iy+1][ih+1]*dx*(1.-dt)*dh*dy;
-  vy+=hydro_vy[it+1][ix+1][iy][ih+1]*dx*(1.-dy)*dt*dh;
-  vy+=hydro_vy[it+1][ix+1][iy+1][ih]*dx*dt*(1.-dh)*dy;
-  vy+=hydro_vy[it+1][ix][iy+1][ih+1]*(1.-dx)*dy*dt*dh;
-  vy+=hydro_vy[it+1][ix+1][iy+1][ih+1]*dx*dy*dt*dh;
-  
-  return vy/1000; 
- }
- 
- double get_hydro_vh(double tau, double x, double y, double eta){ 
-  int it=get_it(tau);
-  int ix=get_ix(x);
-  int iy=get_iy(y);
-  int ih=get_ih(eta);
-  double dt=get_dt(it,tau);
-  double dx=get_dx(ix,x);
-  double dy=get_dy(iy,y);
-  double dh=get_dh(ih,eta);
-  double vh=0;
-  
-  if (tau>tau1) {
-   return vh;
-  }
-  
-  if (ix<0 || ix>maxx || iy>maxy || ih>maxh) return vh;
-  
-  vh=hydro_vh[it][ix][iy][ih]*(1.-dt)*(1.-dx)*(1.-dy)*(1.-dh);
-  vh+=hydro_vh[it+1][ix][iy][ih]*(1.-dx)*(1.-dy)*(1.-dh)*dt;
-  vh+=hydro_vh[it][ix+1][iy][ih]*(1.-dt)*(1.-dy)*(1.-dh)*dx;
-  vh+=hydro_vh[it][ix][iy+1][ih]*(1.-dx)*(1.-dt)*(1.-dh)*dy;
-  vh+=hydro_vh[it][ix][iy][ih+1]*(1.-dx)*(1.-dy)*(1.-dt)*dh;
-  vh+=hydro_vh[it+1][ix+1][iy][ih]*dx*(1.-dy)*(1.-dh)*dt;
-  vh+=hydro_vh[it][ix+1][iy+1][ih]*(1.-dt)*dy*(1.-dh)*dx;
-  vh+=hydro_vh[it][ix][iy+1][ih+1]*(1.-dx)*(1.-dt)*dh*dy;
-  vh+=hydro_vh[it][ix+1][iy][ih+1]*dx*(1.-dy)*(1.-dt)*dh;
-  vh+=hydro_vh[it+1][ix][iy+1][ih]*(1.-dx)*dt*(1.-dh)*dy;
-  vh+=hydro_vh[it+1][ix][iy][ih+1]*(1.-dx)*(1.-dy)*dt*dh;
-  vh+=hydro_vh[it][ix+1][iy+1][ih+1]*dx*(1.-dt)*dh*dy;
-  vh+=hydro_vh[it+1][ix+1][iy][ih+1]*dx*(1.-dy)*dt*dh;
-  vh+=hydro_vh[it+1][ix+1][iy+1][ih]*dx*dt*(1.-dh)*dy;
-  vh+=hydro_vh[it+1][ix][iy+1][ih+1]*(1.-dx)*dy*dt*dh;
-  vh+=hydro_vh[it+1][ix+1][iy+1][ih+1]*dx*dy*dt*dh;
-  
-  return vh/1000; 
- }
 };
 
 
@@ -390,6 +95,8 @@ struct Fragment
   double final_x;
   double final_y;
   double final_z;
+  double initial_T;
+  double final_T;
   double phi;
   double f;
   double quenched_E;
@@ -399,9 +106,6 @@ struct Fragment
   int jet_index_incone;
   int jet_index_incone_ancestor;
   int QG_jet;
-  int quench_method;
-  double power;
-  double power_t;
  public:
   Fragment(int id, double px, double py, double pz, double E, double m, int momID, int QG, int initialIQG)
   {
@@ -428,6 +132,8 @@ struct Fragment
    final_x=0;
    final_y=0;
    final_z=0;
+   initial_T=0;
+   final_T=0;
    phi=0;
    f=0;
    quenched_E = E;
@@ -437,9 +143,6 @@ struct Fragment
    jet_index_incone=-1;
    jet_index_incone_ancestor=-1;
    QG_jet=0;
-   int quench_method=0;
-   double power=1.;
-   double power_t=0.;
   } 
 //!PARTICLE PROPERTIES
   int get_id(){return id;}
@@ -514,28 +217,24 @@ struct Fragment
    if(id>3) return f*mother->get_quenched_E();
    if(id<=3) return get_E();
   } 
-  
-  void set_quench_method(int quench_method){
-   this->quench_method=quench_method;
-   if(quench_method==0) power=1.;
-   else if(quench_method==1) power=2.;
-   else if(quench_method==2) power=1.33333;
-   else if(quench_method==4){
-    power=3.;
-    power_t=1.;
-   }
-  }
-  int get_quench_method(){
-   return quench_method;
-  }
-  double get_power(){return power;}
-  double get_power_t(){return power_t;}
-  
   void set_quenched_E(double quenched_E){
   //!quench_method = 0 -> Light quark quenching 
   //!quench_method = 1 -> Heavy quark quenching 
   //!quench_method = 2 -> Energy independent quenching 
    this->quenched_E=quenched_E;
+  } 
+  
+  void set_initial_T(double initial_T){
+   this->initial_T=initial_T;
+  } 
+  void set_final_T(double final_T){
+   this->final_T=final_T;
+  } 
+  double get_initial_T(){
+   return initial_T;
+  } 
+  double get_final_T(){
+   return final_T;
   } 
   
   double get_tstop(){
@@ -690,19 +389,19 @@ class utilities {
  public:
   static void integrate_T(Fragment *fragment, Hydro *hydro, double factor, double Tc){
    int id=fragment->get_id();
-
+   // cout<<"id="<<fragment->get_id()<<endl;
    double Ei=fragment->get_initial_E();
 
    double px=fragment->get_px();
    double py=fragment->get_py();
    double pz=fragment->get_pz();
-
-   Vector3 *w=new Vector3(px/Ei,py/Ei,pz/Ei);
+   double original_E=fragment->get_E();
+   Vector3 *w=new Vector3(px/original_E,py/original_E,pz/original_E);
    double wdotw=w->dot(w);
    double E=Ei;
-   if(id<=3 || fragment->get_taus()<0.6){
+   if(id<=3){
     fragment->set_quenched_E(E);
-	  return;
+	return;
    }
    double integral=0;
    double initial_x=fragment->get_initial_x();
@@ -717,126 +416,128 @@ class utilities {
    double final_z=fragment->get_final_z();
    double final_t=fragment->get_taus();
    
-   double power=fragment->get_power();
-   double power_t=fragment->get_power_t();
+   if(sqrt(pow(final_t,2)-pow(final_z,2))<0.6){
+    fragment->set_quenched_E(E);
+	  return;
+   }
+   
+   double power=hydro->get_power();
+   double power_t=hydro->get_power_t();
    double T = 0;
+   double Tplus = 0;
    double tstop=0;
-   int quench_method=fragment->get_quench_method();
+   int quench_method=hydro->get_quench_method();
    
    double C;
    int QG=fragment->get_QG();
    if(QG==1) C=1; 
-   if(QG==2) C=9/4;
+   if(QG==2) C=9./4.;
    
 
    double dt=0.01; 
    double t=initial_t;
-   if(initial_t<0.6) t=0.6;
-   double x=initial_x+(final_x-initial_x)*(t-initial_t)/(final_t-initial_t);
-   double y=initial_y+(final_y-initial_y)*(t-initial_t)/(final_t-initial_t);
-   double z=initial_z+(final_z-initial_z)*(t-initial_t)/(final_t-initial_t);
-   double r=sqrt(pow(x,2)+pow(y,2)+pow(z,2));
-   double eta=0.5*log((r+z)/(r-z));
-   // cout<<"id"<<fragment->get_id()<<" mother id="<<fragment->get_mother()->get_id()<<" mother initial_x"<<fragment->get_mother()->get_initial_x()<<" mother final_x"<<fragment->get_mother()->get_initial_x()<<" t="<<t<<" x="<<x<<" initial_x="<<initial_x<<" final_x="<<final_x<<" initial_y="<<initial_y<<" y="<<y<<" eta="<<eta<<endl;
-   T = hydro->get_hydro_T(t,x,y,eta);
-   double vx = hydro->get_hydro_vx(t,x,y,eta);
-   double vy = hydro->get_hydro_vy(t,x,y,eta);
-   double vh = hydro->get_hydro_vh(t,x,y,eta);
-   double gamma=cosh(vh);
-   double vz=sqrt(1-1/pow(gamma,2.)-pow(vx,2.)-pow(vy,2.));
-   
-   Vector3 *v= new Vector3(vx,vy,vz);
-   double wdotv=v->Vector3::dot(w);
-   double vdotv=v->Vector3::dot(v);
-   double coef=sqrt(wdotw+pow(gamma,2)*(vdotv-2*wdotv+pow(wdotv,2)));
-   cout<<"coef="<<coef<<endl;
-   double initial_tplasma=initial_t*coef;
-   double tplasma=initial_tplasma;
+   double tau_initial=sqrt(pow(initial_t,2)-pow(initial_z,2));
+   double tplasma=0;
+   double final_T=0;
+   double x,y,z,tau,eta,xplus,yplus,zplus,tauplus,etaplus;
    while(t<final_t){    
-    if(T<(Tc/1000)) break;
-    if(quench_method!=3){
-     integral += pow(T,power)*pow((tplasma-initial_tplasma)*5,power_t)*dt*coef*5;
-    }else{
-     double EFi=Ei*gamma*(1-wdotv);
-     tstop=0.2*pow(EFi/C,1./3.)/(2*factor*pow(T,4./3.)); 
-     if((tplasma-initial_tplasma)>tstop){
-      E=0;
-      break;
-     } 
-     E += (-((4*EFi/3.141592)*pow(tplasma-initial_tplasma,2))/(pow(tstop,2)*sqrt(pow(tstop,2)-pow(tplasma-initial_tplasma,2))))*dt*coef;
-     if(E<0){
-      E=0;
-      break;
-     }
-    }
-    t=t+dt;
-    tplasma=tplasma+dt*coef;
+    if((final_t-t)<dt){
+	 dt=final_t-t;
+	}
     x=initial_x+(final_x-initial_x)*(t-initial_t)/(final_t-initial_t);
     y=initial_y+(final_y-initial_y)*(t-initial_t)/(final_t-initial_t);
     z=initial_z+(final_z-initial_z)*(t-initial_t)/(final_t-initial_t);
-    r=sqrt(pow(x,2)+pow(y,2)+pow(z,2));
-    eta=0.5*log((r+z)/(r-z));
-     
-    T = hydro->get_hydro_T(t,x,y,eta);
+    tau=sqrt(pow(t,2)-pow(z,2));
+    eta=0.5*log((t+z)/(t-z));
+ 
+    xplus=initial_x+(final_x-initial_x)*(t+dt-initial_t)/(final_t-initial_t);
+    yplus=initial_y+(final_y-initial_y)*(t+dt-initial_t)/(final_t-initial_t);
+    zplus=initial_z+(final_z-initial_z)*(t+dt-initial_t)/(final_t-initial_t);
+    tauplus=sqrt(pow(t+dt,2)-pow(zplus,2));
+    etaplus=0.5*log((t+dt+zplus)/(t+dt-zplus));
+	
+    if((tau+tauplus)/2<0.6){
+     t=t+dt;
+     continue;
+    }else{
+     T = hydro->get_hydro_T(tau,x,y,eta);
+     Tplus = hydro->get_hydro_T(tauplus,xplus,yplus,etaplus);
+	 T=(T+Tplus)/2;
+     if(T<(Tc/1000)) break;
 
-    vx = hydro->get_hydro_vx(t,x,y,eta);
-    vy = hydro->get_hydro_vy(t,x,y,eta);
-    vh = hydro->get_hydro_vh(t,x,y,eta);
-       
-    gamma=cosh(vh);
-    vz=sqrt(1-1/pow(gamma,2.)-pow(vx,2.)-pow(vy,2.));
-   
-    v->reset(vx,vy,vz);
-    wdotv=v->Vector3::dot(w);
-    vdotv=v->Vector3::dot(v);
-    coef=sqrt(wdotw+pow(gamma,2)*(vdotv-2*wdotv+pow(wdotv,2)));
-   }
-                         cout<<"integrate_T.17"<<endl;
+     double vx = hydro->get_hydro_vx(tau,x,y,eta);
+     double vy = hydro->get_hydro_vy(tau,x,y,eta);
+     double vh = hydro->get_hydro_vh(tau,x,y,eta);
+     double vz=tanh(vh);
 
-   if(quench_method == 0){
-    E=C*Ei*exp(-factor*integral); 
+     Vector3 *v= new Vector3(vx,vy,vz);
+     double wdotv=v->Vector3::dot(w);
+     double vdotv=v->Vector3::dot(v);
+	 if(vdotv>=1) vdotv=0.9999999;
+     double gamma=1/sqrt(1-vdotv);
+	 
+     double coef=sqrt(wdotw+pow(gamma,2)*(vdotv-2*wdotv+pow(wdotv,2)));
+     if(tplasma==0){ 
+      // cout<<"initial T= "<<T<<" initial x=" << (x+xplus)/2<<" initial y=" << (y+yplus)/2<<" initial z=" << (z+zplus)/2<<" initial tau=" << (tau+tauplus)/2<<" initial eta=" << (eta+etaplus)/2<<" initial vx="<<vx<<" initial vy"<<vy<<" initial vz"<<vz<<" gamma="<<gamma<<" wdotw="<<wdotw<<" vdotw="<<wdotv<<" dxf="<<coef*dt<<endl;
+     }
+
+     if(quench_method==0){
+      E += -C*factor*pow(T,power)*dt*5;
+     }else if(quench_method==1){
+      E += -C*factor*pow(T,power)*pow((tplasma)*5,power_t)*dt*5;
+	   }else if(quench_method==2){
+      double EFi=Ei*gamma*(1-wdotv);
+      tstop=0.2*pow(EFi/C,1./3.)/(2*factor*pow(T,4./3.)); 
+      if(tplasma>tstop){
+       E=0;
+       break;
+      } 
+      E += (-((4*EFi/3.141592)*pow(tplasma,2))/(pow(tstop,2)*sqrt(pow(tstop,2)-pow(tplasma,2))))*dt;
+     }
+     t+=dt;
+     tplasma+=dt*coef;
+     final_T=T;
+    }
+
+	 if(E<0){
+       E=0;
+       break;
+    }
    }
-   else if(quench_method == 1){
-    E=Ei-C*factor*integral;
-    cout<<"E="<<E<<" subtracted"<<C*factor*integral<<" Ei="<<Ei<<endl;
-   }
-   else if(quench_method==2 && Ei>0.0001){
-    double deltaE= 1-2*factor*pow(C,1.33333)*(1/pow(Ei,0.33333))*integral;
-	  if(deltaE>=0)E=Ei*sqrt(deltaE);
-	  else E=0; 
-   }
-   else if(quench_method==4){
-    E=Ei-C*factor*integral;
-   }
-   if(E<0) E=0;
-   cout<<"E="<<E<<" Ei="<<Ei<<endl;
+    // cout<<"final T ="<<final_T<<"  final x="<<(x+xplus)/2<<"  final y="<<(y+yplus)/2<<" final z="<<(z+zplus)/2<<" final tau="<<(tau+tauplus)/2<<" final eta="<<(eta+etaplus)/2<<" xF="<<tplasma<<endl;
+   fragment->set_final_T(final_T);
+   // cout<<"E="<<E<<" t= "<<final_t-initial_t<<" C="<<C<<" factor="<<factor<<" subtracted"<<C*factor*integral<<" Ei="<<Ei<<" Original E="<<fragment->get_E()<<endl;
+   // cout<<"E="<<E<<" Ei="<<Ei<<endl;
    fragment->set_quenched_E(E);
   }
   
   static double embed(Fragment *fragment, Hydro *hydro){
 
-   double t=0.6;
-   double maxx=hydro->get_maxx();
-   double maxy=hydro->get_maxy();
-   double maxh=hydro->get_maxh();
-   
    bool passed_value=false;
-   double maxT6=0.005;
-   double x;
-   double y;
-   double h;
-   double T6,randT6;
+   double maxNcoll=3.19868;
+   double x=0;
+   double y=0;
+   double h=0;
+   double z=0;
+   double ncoll,randNcoll;
 
    while(!passed_value){
-	// cout<<"time"<<time(NULL)<<endl;
-    x=2*maxx*((double) (rand()%10000) / 10000.)-maxx;
-    y=2*maxy*((double) (rand()%10000) / 10000.)-maxy;
-    h=2*maxh*((double) (rand()%10000) / 10000.)-maxh;
-    randT6=maxT6*((double) (rand()%10000) / 10000.);
-    T6 = pow(hydro->get_hydro_T(t,x,y,h),6);
-    if(T6>randT6)passed_value=true;    
+    x=2*hydro->xmax*((double) (rand()%10000) / 10000.)-hydro->xmax;
+    y=2*hydro->ymax*((double) (rand()%10000) / 10000.)-hydro->ymax;
+    double b=(hydro->get_bmax_bin()-hydro->get_bmin_bin())*((double) (rand()%10000) / 10000.)+hydro->get_bmin_bin();
+    double randNcoll=maxNcoll*((double) (rand()%10000) / 10000.);
+    
+    double dx=hydro->xmax/((double)(hydro->nx));
+    double dy=hydro->ymax/((double)(hydro->ny));
+    double db=hydro->bmax/((double)(hydro->nb));
+    int ix = (int)(fabs(x)/dx);
+    int iy = (int)(fabs(y)/dx);
+    int ib = (int)(b/db);
+    double ncoll=0;
+    if(ix<hydro->nx && iy<hydro->ny && ib<hydro->nb) ncoll=hydro->Ncoll[ix][iy][ib];
+    if(ncoll>randNcoll)passed_value=true;    
    }
-   double z=sqrt(pow(x,2)+pow(y,2))*sinh(h);
+
    fragment->set_initial_x(x);
    fragment->set_initial_y(y);
    fragment->set_initial_z(z);
@@ -1031,8 +732,7 @@ struct Event
 
    void set_all_taus_coordinates_geometry(Hydro *hydro){//!SET TAUS OF EACH PARTICLE UP TO THE HARD SCATTERING 
     Fragment * hard_scattering=findFragment_byId(3);
-	utilities::embed(hard_scattering,hydro);
-
+	  utilities::embed(hard_scattering,hydro);
     for(int i=0; i<number_of_fragments; i++){
      Fragment * elem = fragments[i];
      if(elem->is_descendant(hard_scattering) && elem->get_id()!=3){
@@ -1047,11 +747,11 @@ struct Event
 
    void quench_geometry(Hydro* hydro, double factor,int quench_method=0,double Tc=200){
     Fragment * hard_scattering=findFragment_byId(3);
+	  hydro->set_quench_method(quench_method);
     for(int i=0; i<number_of_fragments; i++){
      Fragment * elem = fragments[i];
      if(elem->is_descendant(hard_scattering) and elem->get_id()!=3){
-      fragments[i]->set_quench_method(quench_method);
-      utilities::integrate_T(fragments[i], hydro, factor,Tc);
+      utilities::integrate_T(fragments[i], hydro, factor, Tc);
      }
     }
    }

@@ -1,8 +1,5 @@
 #include "hybrid.h"
 // #include "TH1.h"
-// #include "TH2D.h"
-// #include "TH1D.h"
-// #include "TFile.h"
 
 // g++ `root-config --cflags` runQR.cc -o runQR `fastjet-install/bin/fastjet-config --cxxflags --libs --plugins` `root-config --libs`
       
@@ -10,18 +7,19 @@ int main(int argc, char* argv[]) {
  srand((unsigned)time(NULL));
 
  int quench_method=atoi(argv[1]);
+ cout<<"quench_method="<<quench_method<<endl;
+
  if(quench_method>4){
   cout<<"argv[1] cannot be larger than 4"<<endl;
   return 0;
  }
  int centrality_bin=atoi(argv[2]);
+ cout<<"centrality_bin="<<centrality_bin<<endl;
  if(centrality_bin>8){
   cout<<"argv[2] cannot be larger than 8"<<endl;
   return 0;
  }
  
- cout<<"centrality_bin="<<centrality_bin<<endl;
- cout<<"quench_method="<<quench_method<<endl;
  double factor=atof(argv[3]);
  cout<<"factor="<<factor<<endl;
  double Tc=atof(argv[4]);
@@ -30,21 +28,27 @@ int main(int argc, char* argv[]) {
  std::string min_centrality_bins[]={"00","05","10","20","30","40","50","60","70"};
  std::string max_centrality_bins[]={"05","10","20","30","40","50","60","70","80"};
 
+ double bmin_bin[]={0.,3.5,4.94,6.98,8.55,9.88,11.04,12.09};
+ double bmax_bin[]={3.5,4.94,6.98,8.55,9.88,11.04,12.09,13.05};
+ 
  std::stringstream fhydro;
- fhydro <<"../HiranoHydro/PbPb2760_"<<"00"<<"-"<<"05"<<".dat";   
- Hydro *hydro = new Hydro(fhydro.str().c_str());
+ fhydro <<"../HiranoHydro/PbPb2760_"<<"00"<<"-"<<"05"<<".bin";   
+ Hydro *hydro = new Hydro(0,fhydro.str().c_str(),"Ncoll_matrix.bin");
  cout<<fhydro.str().c_str()<<endl;
-
- for(int ifile=0; ifile<1;ifile++){
+ 
+ hydro->set_bmin_bin(bmin_bin[centrality_bin]);
+ hydro->set_bmin_bin(bmax_bin[centrality_bin]);
+ 
+ for(int ifile=0; ifile<200;ifile++){ 
   std::stringstream fpythia;
   // fpythia<<"/afs/cern.ch/work/d/dgulhan/dataQG/maindata_p"<<ifile<<"_1000evts.txt";
-  fpythia<<"oneevt.dat";
+  fpythia<<"/afs/cern.ch/user/d/dgulhan/workDir/dataQG/maindata_p"<<ifile<<"_1000evts.txt";
   DataFile_Parser *file = new DataFile_Parser(fpythia.str().c_str());//pythia file
   vector <Event> event_vector = file->get_event_vector();
   cout <<fpythia.str().c_str()<<endl;
  
   std::stringstream fout;
-  fout << "Outfile/datafile_jetfile_" << ifile << "_centrality_" << min_centrality_bins[centrality_bin] << "_"<< max_centrality_bins[centrality_bin] << "_factor" << (factor) << "_Tc"<<Tc<<".txt";   
+  fout << "Outfile_m"<<quench_method<<"/datafile_jetfile_" << ifile <<"_method_"<<quench_method<< "_centrality_" << min_centrality_bins[centrality_bin] << "_"<< max_centrality_bins[centrality_bin] << "_factor" << (factor) << "_Tc"<<Tc<<".txt";   
   ofstream myfile;
   myfile.open(fout.str().c_str());
 
