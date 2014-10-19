@@ -48,6 +48,7 @@ struct Hydro
   double power_t;
   double bmin_bin;
   double bmax_bin;
+  double max_ncoll;
  public:
   double hydro_T[101][121][61][21];
   double hydro_E[101][121][61][21];
@@ -59,19 +60,30 @@ struct Hydro
   static const int  ny=500;
   static const int  nz=500;
   static const int  nb=100;
+  static const int  nrho2=1000;
   
   static const double bmax=13.05;
   static const double xmax=10;
   static const double ymax=10;
   static const double zmax=10;
+  static const double rho2max=150;
   double Ncoll[nx][ny][nb];
+  double TAA[nrho2];
   
   Hydro(){};
-  Hydro(bool is_txt, const char *file_path, const char *file_Ncoll)
+  Hydro(bool is_txt, int centrality_bin, const char *file_Ncoll, const char *file_TAA)
   {
+  
+   std::string min_centrality_bins[]={"00","05","10","20","30","40","50","60","70"};
+   std::string max_centrality_bins[]={"05","10","20","30","40","50","60","70","80"};
+
+   std::stringstream fhydro;
+   fhydro <<"../HiranoHydro/PbPb2760_"<<min_centrality_bins[centrality_bin]<<"-"<<max_centrality_bins[centrality_bin];   
+   
    if(is_txt){  
+    fhydro<<".dat";
     cout<<"start"<<endl; 
-    ifstream input_file(file_path);
+    ifstream input_file(fhydro.str().c_str());
     string line;
     int state=1;
     quench_method=0;
@@ -116,8 +128,9 @@ struct Hydro
     input_file.close();
     cout<<"end"<<endl;
    }else{
+    fhydro<<".bin";
     ifstream myFile;
-    myFile.open(file_path, ios::in | ios::binary);
+    myFile.open(fhydro.str().c_str(), ios::in | ios::binary);
  
     myFile.read((char *)(hydro_T), sizeof(hydro_T));
     myFile.read((char *)(hydro_E), sizeof(hydro_E));
@@ -128,10 +141,36 @@ struct Hydro
     myFile.close();   
    }
    
+   double bmin_values[]={0.,3.5,4.94,6.98,8.55,9.88,11.04,12.09};
+   double bmax_values[]={3.5,4.94,6.98,8.55,9.88,11.04,12.09,13.05};
+  
+   this->set_bmin_bin(bmin_values[centrality_bin]);
+   this->set_bmax_bin(bmax_values[centrality_bin]);
+   
    ifstream fileNcoll;
    fileNcoll.open(file_Ncoll, ios::in | ios::binary);
- 
    fileNcoll.read((char *)(Ncoll), sizeof(Ncoll));
+   
+   ifstream fileTAA;
+   fileTAA.open(file_TAA, ios::in | ios::binary);
+   fileTAA.read((char *)(TAA), sizeof(TAA));
+   
+   max_ncoll=0;
+   double max_taa=0;
+   for(int i=0;i<nrho2;i++){
+    if(TAA[i]>max_taa) max_taa=TAA[i];
+   }
+   
+   for(int i=0;i<nb;i++){
+    for(int j=0;j<nx;j++){
+	 for(int k=0;k<ny;k++){
+	  if(Ncoll[j][k][i]>max_ncoll) max_ncoll=Ncoll[j][k][i];
+	 }
+	}
+   }
+   
+   if((max_taa*max_taa)>max_ncoll) max_ncoll=max_taa*max_taa;
+   set_max_ncoll(max_ncoll);
    
   }
   double get_maxx(){return maxx;}
@@ -146,12 +185,20 @@ struct Hydro
    this->bmax_bin=bmax;
   }
   
-  bool get_bmin_bin(){
+  double get_bmin_bin(){
    return bmin_bin;
   }
   
-  bool get_bmax_bin(){
+  double get_bmax_bin(){
    return bmax_bin;
+  }
+  
+  void set_max_ncoll(double max_ncoll){
+   this->max_ncoll=max_ncoll;
+  }
+  
+  double get_max_ncoll(){
+   return max_ncoll;
   }
   
   int get_it(double tau){

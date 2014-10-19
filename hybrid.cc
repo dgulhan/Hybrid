@@ -24,31 +24,28 @@ int main(int argc, char* argv[]) {
  cout<<"factor="<<factor<<endl;
  double Tc=atof(argv[4]);
   cout<<"Tc="<<Tc<<endl;
-
+ 
+ int ifirst = atoi(argv[5]);
+ int ilast = atoi(argv[6]);
+ if(ilast>200) ilast=200;
+ 
+ Hydro *hydro = new Hydro(0,centrality_bin,"Ncoll_matrix.bin","TAA_matrix.bin");
+ // cout<<fhydro.str().c_str()<<endl;
+ 
+ 
  std::string min_centrality_bins[]={"00","05","10","20","30","40","50","60","70"};
  std::string max_centrality_bins[]={"05","10","20","30","40","50","60","70","80"};
 
- double bmin_bin[]={0.,3.5,4.94,6.98,8.55,9.88,11.04,12.09};
- double bmax_bin[]={3.5,4.94,6.98,8.55,9.88,11.04,12.09,13.05};
- 
- std::stringstream fhydro;
- fhydro <<"../HiranoHydro/PbPb2760_"<<"00"<<"-"<<"05"<<".bin";   
- Hydro *hydro = new Hydro(0,fhydro.str().c_str(),"Ncoll_matrix.bin");
- cout<<fhydro.str().c_str()<<endl;
- 
- hydro->set_bmin_bin(bmin_bin[centrality_bin]);
- hydro->set_bmin_bin(bmax_bin[centrality_bin]);
- 
- for(int ifile=0; ifile<200;ifile++){ 
+ for(int ifile=ifirst; ifile<ilast;ifile++){ 
   std::stringstream fpythia;
   // fpythia<<"/afs/cern.ch/work/d/dgulhan/dataQG/maindata_p"<<ifile<<"_1000evts.txt";
   fpythia<<"/afs/cern.ch/user/d/dgulhan/workDir/dataQG/maindata_p"<<ifile<<"_1000evts.txt";
   DataFile_Parser *file = new DataFile_Parser(fpythia.str().c_str());//pythia file
-  vector <Event> event_vector = file->get_event_vector();
   cout <<fpythia.str().c_str()<<endl;
+  vector <Event> event_vector = file->get_event_vector(); 
  
   std::stringstream fout;
-  fout << "Outfile_m"<<quench_method<<"/datafile_jetfile_" << ifile <<"_method_"<<quench_method<< "_centrality_" << min_centrality_bins[centrality_bin] << "_"<< max_centrality_bins[centrality_bin] << "_factor" << (factor) << "_Tc"<<Tc<<".txt";   
+  fout << "Outfile_m"<<quench_method<<"_xcheck/datafile_jetfile_" << ifile <<"_method_"<<quench_method<< "_centrality_" << min_centrality_bins[centrality_bin] << "_"<< max_centrality_bins[centrality_bin] << "_factor" << (factor) << "_Tc"<<Tc<<".txt";   
   ofstream myfile;
   myfile.open(fout.str().c_str());
 
@@ -74,14 +71,16 @@ int main(int argc, char* argv[]) {
    int nfrags = it->get_number_of_fragments();
    for(int i=0;i<nfrags;i++){
     Fragment * elem=it->get_ieth_fragment(i);
+    if(elem->get_taus()<50) continue;
     double qE = elem->get_quenched_E();
     double p_quench_factor = elem->get_quenched_E()/elem->get_E();
     double qpx = p_quench_factor*elem->get_px();
     double qpy = p_quench_factor*elem->get_py();
     double qpz = p_quench_factor*elem->get_pz(); 
     myfile <<elem->get_id()<<" " <<elem->get_px() << " "<< elem->get_py() << " " << elem->get_pz() << " " << elem->get_E() <<" "<<elem->get_px()*p_quench_factor << " "<< elem->get_py()*p_quench_factor << " " << elem->get_pz()*p_quench_factor << " " << elem->get_quenched_E() <<" "<<elem->get_QG()<<"\n";
-
    }   
+   myfile<<"END\n";
+
   }
   myfile.close();
  }

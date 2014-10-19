@@ -13,33 +13,8 @@
 #include <math.h>
 #include <time.h>
 #include "hydro.h"
-// #include "Glauber/IntegrateT_v4.C"
-// #include "Glauber/LQNumericIntegral.C"
-// #include "Glauber/LQNumericIntegral_v2.C"
-// #include "Glauber/jetPosition.C"
-// #include "Glauber/fTnucleon.h"
-// #include "TH2D.h"
-// #include "TH1D.h"
-// #include "TFile.h"
 
 using namespace std;
-
-// trim from start
-// static inline string &ltrim(string &s) {
- // s.erase(s.begin(), std::find_if(s.begin(), s.end(), not1(ptr_fun<int, int>(isspace))));
- // return s;
-// }
-
-// trim from end
-// static inline std::string &rtrim(string &s) {
- // s.erase(find_if(s.rbegin(), s.rend(), not1(ptr_fun<int, int>(isspace))).base(), s.end());
- // return s;
-// }
-
-// trim from both ends
-// static inline string &trim(string &s) {
- // return ltrim(rtrim(s));
-// }
 
 struct Vector3
 {
@@ -477,9 +452,6 @@ class utilities {
      double gamma=1/sqrt(1-vdotv);
 	 
      double coef=sqrt(wdotw+pow(gamma,2)*(vdotv-2*wdotv+pow(wdotv,2)));
-     if(tplasma==0){ 
-      // cout<<"initial T= "<<T<<" initial x=" << (x+xplus)/2<<" initial y=" << (y+yplus)/2<<" initial z=" << (z+zplus)/2<<" initial tau=" << (tau+tauplus)/2<<" initial eta=" << (eta+etaplus)/2<<" initial vx="<<vx<<" initial vy"<<vy<<" initial vz"<<vz<<" gamma="<<gamma<<" wdotw="<<wdotw<<" vdotw="<<wdotv<<" dxf="<<coef*dt<<endl;
-     }
 
      if(quench_method==0){
       E += -C*factor*pow(T,power)*dt*5;
@@ -504,43 +476,90 @@ class utilities {
        break;
     }
    }
-    // cout<<"final T ="<<final_T<<"  final x="<<(x+xplus)/2<<"  final y="<<(y+yplus)/2<<" final z="<<(z+zplus)/2<<" final tau="<<(tau+tauplus)/2<<" final eta="<<(eta+etaplus)/2<<" xF="<<tplasma<<endl;
    fragment->set_final_T(final_T);
-   // cout<<"E="<<E<<" t= "<<final_t-initial_t<<" C="<<C<<" factor="<<factor<<" subtracted"<<C*factor*integral<<" Ei="<<Ei<<" Original E="<<fragment->get_E()<<endl;
-   // cout<<"E="<<E<<" Ei="<<Ei<<endl;
    fragment->set_quenched_E(E);
   }
   
   static double embed(Fragment *fragment, Hydro *hydro){
-
+   bool do_minimum_bias_b=true;
+   bool do_embed_ncoll=false;
+   bool do_fixed_b=true;
+   if(!do_minimum_bias_b) do_fixed_b=false;
    bool passed_value=false;
-   double maxNcoll=3.19868;
+   double maxNcoll=hydro->get_max_ncoll();
    double x=0;
    double y=0;
-   double h=0;
+   double h=0; 
    double z=0;
+   double b=0;
    double ncoll,randNcoll;
+   
+   double db=hydro->bmax/((double)(hydro->nb));
+   double dx=hydro->xmax/((double)(hydro->nx));
+   double dy=hydro->ymax/((double)(hydro->ny));
+   double drho2=hydro->rho2max/((double)(hydro->nrho2));
+   
+   if(do_minimum_bias_b){
+    double b2=(pow(hydro->get_bmax_bin(),2)-pow(hydro->get_bmin_bin(),2))*((double) (rand()%10000) / 10000.)+pow(hydro->get_bmin_bin(),2);
+	b=sqrt(b2);
+	if(do_fixed_b) b=2.5;
+   }    
+   int ib = (int)(b/db);
 
-   while(!passed_value){
-    x=2*hydro->xmax*((double) (rand()%10000) / 10000.)-hydro->xmax;
-    y=2*hydro->ymax*((double) (rand()%10000) / 10000.)-hydro->ymax;
-    double b=(hydro->get_bmax_bin()-hydro->get_bmin_bin())*((double) (rand()%10000) / 10000.)+hydro->get_bmin_bin();
-    double randNcoll=maxNcoll*((double) (rand()%10000) / 10000.);
+   if(do_embed_ncoll){
+    while(!passed_value){
+     y=2*hydro->ymax*((double) (rand()%10000) / 10000.)-hydro->ymax;
+     x=(2*hydro->xmax-b)*((double) (rand()%10000) / 10000.)-(2*hydro->xmax-b)/2.;
+     if(!do_minimum_bias_b){
+ 	  b=(hydro->get_bmax_bin()-hydro->get_bmin_bin())*((double) (rand()%10000) / 10000.)+hydro->get_bmin_bin();
+      ib = (int)(b/db);
+     }
+     double randNcoll=maxNcoll*((double) (rand()%10000) / 10000.);
     
-    double dx=hydro->xmax/((double)(hydro->nx));
-    double dy=hydro->ymax/((double)(hydro->ny));
-    double db=hydro->bmax/((double)(hydro->nb));
-    int ix = (int)(fabs(x)/dx);
-    int iy = (int)(fabs(y)/dx);
-    int ib = (int)(b/db);
-    double ncoll=0;
-    if(ix<hydro->nx && iy<hydro->ny && ib<hydro->nb) ncoll=hydro->Ncoll[ix][iy][ib];
-    if(ncoll>randNcoll)passed_value=true;    
-   }
+     int ix = (int)(fabs(x)/dx);
+     int iy = (int)(fabs(y)/dx);
+	  
+     double ncoll=0;
+     if(ix<hydro->nx && iy<hydro->ny && ib<hydro->nb) ncoll=hydro->Ncoll[ix][iy][ib];
+     if(ncoll>randNcoll)passed_value=true;    
+    } 
+   }else{
+    while(!passed_value){
+     double rho2=hydro->rho2max*((double) (rand()%10000) / 10000.);
+     double phi=2*3.14159265359*((double) (rand()%10000) / 10000.);
+	  
+	 if(!do_minimum_bias_b){
+	  double b2=(pow(hydro->get_bmax_bin(),2)-pow(hydro->get_bmin_bin(),2))*((double) (rand()%10000) / 10000.)+pow(hydro->get_bmin_bin(),2);
+	  b=sqrt(b2);
+	 }
+	  
+     x=cos(phi)*sqrt(rho2);
+     y=sin(phi)*sqrt(rho2);
+     double xm=x-b/2;
+     double xp=x+b/2;
+	 	  
+	 double rhom=pow(xm,2)+pow(y,2);
+	 double rhop=pow(xp,2)+pow(y,2);
+	
+ 	 if((rhom)>(hydro->rho2max)) continue;
+ 	 if((rhop)>(hydro->rho2max)) continue;
 
+     double drho2=hydro->rho2max/(double)hydro->nrho2;
+	
+ 	 int irhom=(int)(rhom/drho2);
+ 	 int irhop=(int)(rhop/drho2);
+	
+	 double ncoll=hydro->TAA[irhom]*hydro->TAA[irhop];
+	 double randNcoll=maxNcoll*((double) (rand()%10000) / 10000.);
+	 if(ncoll>randNcoll) passed_value=true;
+	}
+   }
+   
    fragment->set_initial_x(x);
    fragment->set_initial_y(y);
    fragment->set_initial_z(z);
+   
+   return b;
   }
 };
 
