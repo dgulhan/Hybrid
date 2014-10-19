@@ -156,17 +156,24 @@ struct Fragment
    return QG_jet;
   }
   void set_initial_coordinates(){
-   if(id>3 && mother->get_id()==3){
-    final_x=initial_x+get_tauf()*px/E;
-    final_y=initial_y+get_tauf()*py/E;
-    final_z=initial_z+get_tauf()*pz/E;
+   // if(id>3 && mother->get_id()==3){
+    // cout<<initial_x<<"initial_x"<<endl;
+    // cout<<initial_x<<"initial_y"<<endl;
+    // final_x=initial_x+get_tauf()*px/E;
+    // final_y=initial_y+get_tauf()*py/E;
+    // final_z=initial_z+get_tauf()*pz/E;
     
-    phi=atan2(get_py(),get_px());
-   }
-   else if(mother->get_id()!=3){
+    // phi=atan2(get_py(),get_px());
+   // }
+   // else if(mother->get_id()!=3){
+   if(id>3){
     initial_x = mother->get_final_x();
     initial_y = mother->get_final_y();
     initial_z = mother->get_final_z();
+    if(mother->get_id()==3){ 
+     cout<<initial_x<<"initial_x"<<endl;
+     cout<<initial_x<<"initial_y"<<endl;
+	}
     final_x=initial_x+get_tauf()*px/E;
     final_y=initial_y+get_tauf()*py/E;
     final_z=initial_z+get_tauf()*pz/E;
@@ -181,6 +188,9 @@ struct Fragment
   double get_initial_x(){return initial_x;}
   double get_initial_y(){return initial_y;}
   double get_initial_z(){return initial_z;}
+  void set_final_x(double final_x){this->final_x=final_x;}
+  void set_final_y(double final_y){this->final_y=final_y;}
+  void set_final_z(double final_z){this->final_z=final_z;}
   double get_final_x(){return final_x;}
   double get_final_y(){return final_y;}
   double get_final_z(){return final_z;}
@@ -482,7 +492,7 @@ class utilities {
   
   static double embed(Fragment *fragment, Hydro *hydro){
    bool do_minimum_bias_b=true;
-   bool do_embed_ncoll=true;
+   bool do_embed_ncoll=false;
    bool do_fixed_b=true;
    if(!do_minimum_bias_b) do_fixed_b=false;
    bool passed_value=false;
@@ -555,9 +565,9 @@ class utilities {
     }
    }
    
-   fragment->set_initial_x(x);
-   fragment->set_initial_y(y);
-   fragment->set_initial_z(z);
+   fragment->set_final_x(x);
+   fragment->set_final_y(y);
+   fragment->set_final_z(z);
    
    return b;
   }
@@ -751,7 +761,7 @@ struct Event
 
    void set_all_taus_coordinates_geometry(Hydro *hydro){//!SET TAUS OF EACH PARTICLE UP TO THE HARD SCATTERING 
     Fragment * hard_scattering=findFragment_byId(3);
-	  utilities::embed(hard_scattering,hydro);
+	utilities::embed(hard_scattering,hydro);
     for(int i=0; i<number_of_fragments; i++){
      Fragment * elem = fragments[i];
      if(elem->is_descendant(hard_scattering) && elem->get_id()!=3){
