@@ -482,7 +482,7 @@ class utilities {
   
   static double embed(Fragment *fragment, Hydro *hydro){
    bool do_minimum_bias_b=true;
-   bool do_embed_ncoll=false;
+   bool do_embed_ncoll=true;
    bool do_fixed_b=true;
    if(!do_minimum_bias_b) do_fixed_b=false;
    bool passed_value=false;
@@ -501,8 +501,8 @@ class utilities {
    
    if(do_minimum_bias_b){
     double b2=(pow(hydro->get_bmax_bin(),2)-pow(hydro->get_bmin_bin(),2))*((double) (rand()%10000) / 10000.)+pow(hydro->get_bmin_bin(),2);
-	b=sqrt(b2);
-	if(do_fixed_b) b=2.5;
+    b=sqrt(b2);
+    if(do_fixed_b) b=2.5;
    }    
    int ib = (int)(b/db);
 
@@ -511,7 +511,7 @@ class utilities {
      y=2*hydro->ymax*((double) (rand()%10000) / 10000.)-hydro->ymax;
      x=(2*hydro->xmax-b)*((double) (rand()%10000) / 10000.)-(2*hydro->xmax-b)/2.;
      if(!do_minimum_bias_b){
- 	  b=(hydro->get_bmax_bin()-hydro->get_bmin_bin())*((double) (rand()%10000) / 10000.)+hydro->get_bmin_bin();
+      b=(hydro->get_bmax_bin()-hydro->get_bmin_bin())*((double) (rand()%10000) / 10000.)+hydro->get_bmin_bin();
       ib = (int)(b/db);
      }
      double randNcoll=maxNcoll*((double) (rand()%10000) / 10000.);
@@ -528,31 +528,31 @@ class utilities {
      double rho2=hydro->rho2max*((double) (rand()%10000) / 10000.);
      double phi=2*3.14159265359*((double) (rand()%10000) / 10000.);
 	  
-	 if(!do_minimum_bias_b){
-	  double b2=(pow(hydro->get_bmax_bin(),2)-pow(hydro->get_bmin_bin(),2))*((double) (rand()%10000) / 10000.)+pow(hydro->get_bmin_bin(),2);
-	  b=sqrt(b2);
-	 }
+     if(!do_minimum_bias_b){
+      double b2=(pow(hydro->get_bmax_bin(),2)-pow(hydro->get_bmin_bin(),2))*((double) (rand()%10000) / 10000.)+pow(hydro->get_bmin_bin(),2);
+      b=sqrt(b2);
+     }
 	  
      x=cos(phi)*sqrt(rho2);
      y=sin(phi)*sqrt(rho2);
      double xm=x-b/2;
      double xp=x+b/2;
 	 	  
-	 double rhom=pow(xm,2)+pow(y,2);
-	 double rhop=pow(xp,2)+pow(y,2);
+     double rhom=pow(xm,2)+pow(y,2);
+     double rhop=pow(xp,2)+pow(y,2);
 	
- 	 if((rhom)>(hydro->rho2max)) continue;
- 	 if((rhop)>(hydro->rho2max)) continue;
+     if((rhom)>(hydro->rho2max)) continue;
+     if((rhop)>(hydro->rho2max)) continue;
 
      double drho2=hydro->rho2max/(double)hydro->nrho2;
 	
- 	 int irhom=(int)(rhom/drho2);
- 	 int irhop=(int)(rhop/drho2);
+     int irhom=(int)(rhom/drho2);
+     int irhop=(int)(rhop/drho2);
 	
-	 double ncoll=hydro->TAA[irhom]*hydro->TAA[irhop];
-	 double randNcoll=maxNcoll*((double) (rand()%10000) / 10000.);
-	 if(ncoll>randNcoll) passed_value=true;
-	}
+     double ncoll=hydro->TAA[irhom]*hydro->TAA[irhop];
+     double randNcoll=maxNcoll*((double) (rand()%10000) / 10000.);
+     if(ncoll>randNcoll) passed_value=true;
+    }
    }
    
    fragment->set_initial_x(x);
