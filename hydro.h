@@ -350,6 +350,7 @@ struct Hydro
    vx+=hydro_vx[it+1][ix][iy+1][ih+1]*(1.-dx)*dy*dt*dh;
    vx+=hydro_vx[it+1][ix+1][iy+1][ih+1]*dx*dy*dt*dh;
    
+   if(eta<=0) vx=-vx;
    return vx; 
   }
   
@@ -387,6 +388,7 @@ struct Hydro
    vy+=hydro_vy[it+1][ix][iy+1][ih+1]*(1.-dx)*dy*dt*dh;
    vy+=hydro_vy[it+1][ix+1][iy+1][ih+1]*dx*dy*dt*dh;
    
+   if(y<=0) vy=-vy;
    return vy; 
  } 
   
@@ -424,6 +426,7 @@ struct Hydro
    vh+=hydro_vh[it+1][ix][iy+1][ih+1]*(1.-dx)*dy*dt*dh;
    vh+=hydro_vh[it+1][ix+1][iy+1][ih+1]*dx*dy*dt*dh;
    
+   if(eta<=0) vh=-vh;
    return vh; 
   }
   void set_quench_method(int quench_method){
