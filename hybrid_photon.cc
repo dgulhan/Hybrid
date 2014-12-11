@@ -41,10 +41,10 @@ int main(int argc, char* argv[]) {
  for(int ifile=0; ifile<1;ifile++){ 
   std::stringstream fpythia;
   // fpythia<<"/afs/cern.ch/work/d/dgulhan/dataQG/maindata_p"<<ifile<<"_1000evts.txt";
-  // fpythia<<"photon/PHOT40.txt";
+  fpythia<<"photon/PHOT40.txt";
   // fpythia<<"/data/dgulhan/Adsdata_pthat50/TREES/full"; 
   // fpythia<<"/data/dgulhan/Adsdata_Photon60/TREES/phot60"<<file_number;
-  fpythia<<"/data/dgulhan/Adsdata_Photon60/TREES/full";
+  // fpythia<<"/data/dgulhan/Adsdata_Photon60/TREES/full";
   // fpythia<<"oneevent_photon.dat";
   DataFile_Parser *file = new DataFile_Parser(fpythia.str().c_str());//pythia file
   cout <<fpythia.str().c_str()<<endl;
@@ -52,15 +52,13 @@ int main(int argc, char* argv[]) {
 
   std::stringstream fout;
   // fout << "Outfile_m"<<quench_method<<"_photon60/"<< "datafile_jetfile_" << file_number <<"_method_"<<quench_method<< "_centrality_" << min_centrality_bins[centrality_bin] << "_"<< max_centrality_bins[centrality_bin] << "_factor" << (factor) << "_Tc"<<Tc<<".txt";   
-  fout << "Outfile_m"<<quench_method<<"_photon60/"<< "datafile_jetfile_" << file_number <<"_method_"<<quench_method<< "_centrality_" << min_centrality_bins[centrality_bin] << "_"<< max_centrality_bins[centrality_bin] << "_factor" << (factor) << "_Tc"<<Tc<<".txt";   
-  // fout << "test.txt";   
+  fout << "test.txt";   
   ofstream myfile;
   myfile.open(fout.str().c_str());
 
   int event=0;
   for(vector <Event>::iterator it = event_vector.begin(); it != event_vector.end(); ++it){
 
-   // if(it->get_number_of_jets()==0) continue;
    cout<<"in event loop at event number"<<event<<"\n";
 
    cout<<"number of jets = "<<it->get_number_of_jets()<<endl;
@@ -96,6 +94,5 @@ int main(int argc, char* argv[]) {
   }
   myfile.close();
  }
- // fhydro.close();
- // fpythia.close();
+ fpythia.close();
 }
