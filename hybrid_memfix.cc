@@ -50,7 +50,7 @@ int main(int argc, char* argv[]) {
    if(!it) break;
 
    event++;  
-   if(event%10000==0) cout<<"event="<<event<<endl;
+   //cout<<"event="<<event<<endl;
 
    //cout<<"number of jets = "<<it->get_number_of_jets()<<endl;
    it->findInconeFragments();
